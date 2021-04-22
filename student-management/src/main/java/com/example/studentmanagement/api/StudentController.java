@@ -1,6 +1,8 @@
 package com.example.studentmanagement.api;
 
+import com.example.studentmanagement.exceptions.InvalidUniversityClassException;
 import com.example.studentmanagement.exceptions.StudentEmptyNameException;
+import com.example.studentmanagement.exceptions.StudentNonExistException;
 import com.example.studentmanagement.model.Student;
 import com.example.studentmanagement.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,20 @@ public class StudentController {
             Student savedStudent=studentService.addStudent(student);
             return ResponseEntity.ok("Registerd student. "+student.toString());
         } catch (StudentEmptyNameException e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping(path="assignclass/{sid}/{cid}")
+    public ResponseEntity<String> assignClass(@PathVariable("sid") Long studentId,
+                                              @PathVariable("cid") Long classId){
+        try{
+            Student updatedStudent=studentService.assignClass(studentId,classId);
+            return ResponseEntity.ok("Assigned class: "+updatedStudent.toString());
+
+        }catch(InvalidUniversityClassException e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }catch(StudentNonExistException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }

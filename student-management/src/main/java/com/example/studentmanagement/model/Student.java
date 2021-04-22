@@ -19,6 +19,19 @@ public class Student {
     @Column(nullable = false, name="name")
     private String name;
 
+    public UniversityClass getUniversityClass() {
+        return universityClass;
+    }
+
+    public void setUniversityClass(UniversityClass universityClass) {
+        this.universityClass = universityClass;
+    }
+
+    //set foreign key
+    @ManyToOne
+    @JoinColumn(name="University_Class_id")
+    private UniversityClass universityClass;
+
     public Student(Long id, String name) {
         this.id = id;
         this.name = name;
