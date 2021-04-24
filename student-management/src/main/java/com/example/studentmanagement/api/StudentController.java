@@ -28,6 +28,12 @@ public class StudentController {
         return studentService.getAllStudents();
     }
 
+    @GetMapping("/name")
+    //localhost:8080/api/student/name?name=zhangsan
+    public List<Student> getStudents(@RequestParam String name){
+        return studentService.getStudentsByName(name);
+    }
+
     @RequestMapping("/register")
     @PostMapping
     public ResponseEntity<String> registerStudent(@RequestBody Student student){
