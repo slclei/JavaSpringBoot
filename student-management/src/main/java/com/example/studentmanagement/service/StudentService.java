@@ -72,5 +72,11 @@ public class StudentService {
         return studentDao.findByName(name);
     }
 
+    public List<Student> getStudentsContainName(String name){
+        return studentMapper.getStudentsCotainStrInName("%"+name+"%");
+    }
 
+    public List<Student> getStudentsInClass(int year, int number){
+        return studentMapper.getStudentsInClass(year,number);
+    }
 }

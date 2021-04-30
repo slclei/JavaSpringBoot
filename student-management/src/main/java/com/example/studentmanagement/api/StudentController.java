@@ -34,6 +34,18 @@ public class StudentController {
         return studentService.getStudentsByName(name);
     }
 
+    @GetMapping("/contain_name")
+    //localhost:8080/api/student/contain_name?name=T
+    public List<Student> getStudentsContainName(@RequestParam String name){
+        return studentService.getStudentsContainName(name);
+    }
+
+    @GetMapping("/class")
+    //localhost:8080/api/student/class?year=2021&number=1
+    public List<Student> getStudentsInClass(@RequestParam int year,@RequestParam int number){
+        return studentService.getStudentsInClass(year,number);
+    }
+
     @RequestMapping("/register")
     @PostMapping
     public ResponseEntity<String> registerStudent(@RequestBody Student student){
