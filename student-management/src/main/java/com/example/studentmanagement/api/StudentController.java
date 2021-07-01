@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/student")
+@RequestMapping("/api/student")
 public class StudentController {
 
     private StudentService studentService;
@@ -45,6 +45,7 @@ public class StudentController {
         }
     }
 
+    /*
     @PostMapping(path="assignclass/{sid}/{cid}")
     public ResponseEntity<String> assignClass(@PathVariable("sid") Long studentId,
                                               @PathVariable("cid") Long classId){
@@ -55,6 +56,20 @@ public class StudentController {
         }catch(InvalidUniversityClassException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }catch(StudentNonExistException e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }*/
+
+    @PostMapping(path="updateStudent/{sid}/{sn}")
+    public ResponseEntity<String> updateStudent(@PathVariable("sid") Long studentId,
+                                                @PathVariable("sn") String studentName){
+        try{
+            Student updatedStudent=studentService.getStudentById(studentId).get();
+            updatedStudent.setName(studentName);
+            studentService.updateStudent(updatedStudent);
+            return ResponseEntity.ok("Update student: "+updatedStudent.toString());
+
+        }catch(RuntimeException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }

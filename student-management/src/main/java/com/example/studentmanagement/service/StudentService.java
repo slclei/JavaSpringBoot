@@ -37,14 +37,14 @@ public class StudentService {
     }
 
     public Student updateStudent(Student student){
-        if (student.getId()==null || studentDao.existsById(student.getId())){
-            throw new StudentNonExistException("Cannot find student ID");
+        if (student.getId()==null || !studentDao.existsById(student.getId())){
+            throw new StudentNonExistException("Cannot find student ID: "+student.toString());
         }
 
         return studentDao.save(student);
     }
 
-    //install a class for this student
+    /*install a class for this student
     public Student assignClass(Long studentId, Long classId){
         if (!studentDao.existsById(studentId)){
             throw new StudentNonExistException("Cannot find student ID: "+studentId);
@@ -58,7 +58,7 @@ public class StudentService {
 
         student.setUniversityClass(universityClass);
         return studentDao.save(student);
-    }
+    }*/
 
     public List<Student> getAllStudents(){
         return (List<Student>) studentDao.findAll();
