@@ -34111,6 +34111,8 @@ var follow = __webpack_require__(/*! ./follow */ "./src/main/js/follow.js");
 
 var when = __webpack_require__(/*! when */ "./node_modules/when/when.js");
 
+var stompClient = __webpack_require__(/*! ./websocket-listener */ "./src/main/js/websocket-listener.js");
+
 var root = '/api'; //create a React component
 //with state of all students
 //render the component on the screen
@@ -34137,6 +34139,8 @@ var App = /*#__PURE__*/function (_React$Component) {
     _this.onUpdate = _this.onUpdate.bind(_assertThisInitialized(_this));
     _this.onDelete = _this.onDelete.bind(_assertThisInitialized(_this));
     _this.onNavigate = _this.onNavigate.bind(_assertThisInitialized(_this));
+    _this.refreshAndGoToLastPage = _this.refreshAndGoToLastPage.bind(_assertThisInitialized(_this));
+    _this.refreshCurrentPage = _this.refreshCurrentPage.bind(_assertThisInitialized(_this));
     return _this;
   } //React renders a component in the DOM
 
@@ -34145,6 +34149,16 @@ var App = /*#__PURE__*/function (_React$Component) {
     key: "componentDidMount",
     value: function componentDidMount() {
       this.loadFromServer(this.state.pageSize);
+      stompClient.register([{
+        route: '/topic/newStudent',
+        callback: this.refreshAndGoToLastPage
+      }, {
+        route: '/topic/updateStudent',
+        callback: this.refreshCurrentPage
+      }, {
+        route: '/topic/deleteStudent',
+        callback: this.refreshCurrentPage
+      }]);
     } //reload list with updated page
 
   }, {
@@ -34194,11 +34208,8 @@ var App = /*#__PURE__*/function (_React$Component) {
   }, {
     key: "onCreate",
     value: function onCreate(newStudent) {
-      var _this3 = this;
-
-      var self = this;
       follow(client, root, ['students']).then(function (response) {
-        return client({
+        client({
           method: 'POST',
           path: response.entity._links.self.href,
           entity: newStudent,
@@ -34206,27 +34217,12 @@ var App = /*#__PURE__*/function (_React$Component) {
             'Content-Type': 'application/json'
           }
         });
-      }).then(function (response) {
-        return follow(client, root, [{
-          rel: 'students',
-          params: {
-            'size': self.state.pageSize
-          }
-        }]);
-      }).done(function (response) {
-        if (typeof response.entity._links.last !== "undefined") {
-          _this3.onNavigate(response.entity._links.last.href);
-        } else {
-          _this3.onNavigate(response.entity._links.self.href);
-        }
       });
     } //tag::update[]
 
   }, {
     key: "onUpdate",
     value: function onUpdate(student, updatedStudent) {
-      var _this4 = this;
-
       client({
         method: 'PUT',
         path: student.entity._links.self.href,
@@ -34235,9 +34231,7 @@ var App = /*#__PURE__*/function (_React$Component) {
           'Content-Type': 'application/json',
           'If-Match': student.headers.Etag
         }
-      }).done(function (response) {
-        _this4.loadFromServer(_this4.state.pageSize);
-      }, function (response) {
+      }).done(function (response) {}, function (response) {
         if (response.status.code === 412) {
           alert('Denied: unable to update' + student.entity._links.self.href + '. Your copy is stale.');
         } else {
@@ -34250,13 +34244,13 @@ var App = /*#__PURE__*/function (_React$Component) {
   }, {
     key: "onNavigate",
     value: function onNavigate(navUri) {
-      var _this5 = this;
+      var _this3 = this;
 
       client({
         method: 'GET',
         path: navUri
       }).then(function (studentCollection) {
-        _this5.links = studentCollection.entity._links;
+        _this3.links = studentCollection.entity._links;
         return studentCollection.entity._embedded.students.map(function (student) {
           return client({
             method: 'GET',
@@ -34266,24 +34260,20 @@ var App = /*#__PURE__*/function (_React$Component) {
       }).then(function (studentPromises) {
         return when.all(studentPromises);
       }).done(function (students) {
-        _this5.setState({
+        _this3.setState({
           students: students,
-          attributes: Object.keys(_this5.schema.properties),
-          pageSize: _this5.state.pageSize,
-          links: _this5.links
+          attributes: Object.keys(_this3.schema.properties),
+          pageSize: _this3.state.pageSize,
+          links: _this3.links
         });
       });
     }
   }, {
     key: "onDelete",
     value: function onDelete(student) {
-      var _this6 = this;
-
       client({
         method: 'DELETE',
         path: student.entity._links.self.href
-      }).done(function (response) {
-        _this6.loadFromServer(_this6.state.pageSize);
       });
     }
   }, {
@@ -34292,7 +34282,61 @@ var App = /*#__PURE__*/function (_React$Component) {
       if (pageSize !== this.state.pageSize) {
         this.loadFromServer(pageSize);
       }
-    } //draws the component
+    } //tag::refresh and go to last page
+
+  }, {
+    key: "refreshAndGoToLastPage",
+    value: function refreshAndGoToLastPage(message) {
+      var _this4 = this;
+
+      follow(client, root, [{
+        rel: 'students',
+        params: {
+          size: this.state.pageSize
+        }
+      }]).done(function (response) {
+        if (response.entity._links.last !== undefined) {
+          _this4.onNavigate(response.entity._links.last.href);
+        } else {
+          _this4.onNavigate(response.entity._links.self.href);
+        }
+      });
+    } //end::refresh and go to last page
+    //tag::refresh and go to last page
+
+  }, {
+    key: "refreshCurrentPage",
+    value: function refreshCurrentPage(message) {
+      var _this5 = this;
+
+      follow(client, root, [{
+        rel: 'students',
+        params: {
+          size: this.state.pageSize,
+          page: this.state.page.number
+        }
+      }]).then(function (studentCollection) {
+        _this5.links = studentCollection.entity._links;
+        _this5.page = studentCollection.entity.page;
+        return studentCollection.entity._embedded.students.map(function (student) {
+          return client({
+            method: 'GET',
+            path: student._links.self.href
+          });
+        });
+      }).then(function (studentPromises) {
+        return when.all(studentPromises);
+      }).then(function (students) {
+        _this5.setState({
+          page: _this5.page,
+          students: students,
+          attributes: Object.keys(_this5.schema.properties),
+          pageSize: _this5.state.pageSize,
+          links: _this5.links
+        });
+      });
+    } //end::refresh and go to last page
+    //draws the component
 
   }, {
     key: "render",
@@ -34323,32 +34367,32 @@ var CreateDialog = /*#__PURE__*/function (_React$Component2) {
   var _super2 = _createSuper(CreateDialog);
 
   function CreateDialog(props) {
-    var _this7;
+    var _this6;
 
     _classCallCheck(this, CreateDialog);
 
-    _this7 = _super2.call(this, props);
-    _this7.handleSubmit = _this7.handleSubmit.bind(_assertThisInitialized(_this7));
-    return _this7;
+    _this6 = _super2.call(this, props);
+    _this6.handleSubmit = _this6.handleSubmit.bind(_assertThisInitialized(_this6));
+    return _this6;
   }
 
   _createClass(CreateDialog, [{
     key: "handleSubmit",
     value: function handleSubmit(e) {
-      var _this8 = this;
+      var _this7 = this;
 
       //prevent default for e
       e.preventDefault();
       var newStudent = {}; //set all attributes for new student record
 
       this.props.attributes.forEach(function (attribute) {
-        newStudent[attribute] = ReactDOM.findDOMNode(_this8.refs[attribute]).value.trim();
+        newStudent[attribute] = ReactDOM.findDOMNode(_this7.refs[attribute]).value.trim();
       }); //create new student record
 
       this.props.onCreate(newStudent); //clear out the dialog's inputs for next input
 
       this.props.attributes.forEach(function (attribute) {
-        ReactDOM.findDOMNode(_this8.refs[attribute]).value = '';
+        ReactDOM.findDOMNode(_this7.refs[attribute]).value = '';
       }); //Navigate away from the dialog to hide it
 
       window.location = '#';
@@ -34404,24 +34448,24 @@ var UpdateDialog = /*#__PURE__*/function (_React$Component3) {
   var _super3 = _createSuper(UpdateDialog);
 
   function UpdateDialog(props) {
-    var _this9;
+    var _this8;
 
     _classCallCheck(this, UpdateDialog);
 
-    _this9 = _super3.call(this, props);
-    _this9.handleSubmit = _this9.handleSubmit.bind(_assertThisInitialized(_this9));
-    return _this9;
+    _this8 = _super3.call(this, props);
+    _this8.handleSubmit = _this8.handleSubmit.bind(_assertThisInitialized(_this8));
+    return _this8;
   }
 
   _createClass(UpdateDialog, [{
     key: "handleSubmit",
     value: function handleSubmit(e) {
-      var _this10 = this;
+      var _this9 = this;
 
       e.preventDefault();
       var updatedStudent = {};
       this.props.attributes.forEach(function (attribute) {
-        updatedStudent[attribute] = ReactDOM.findDOMNode(_this10.refs[attribute]).value.trim();
+        updatedStudent[attribute] = ReactDOM.findDOMNode(_this9.refs[attribute]).value.trim();
       });
       this.props.onUpdate(this.props.student, updatedStudent);
       window.location = '#';
@@ -34429,15 +34473,15 @@ var UpdateDialog = /*#__PURE__*/function (_React$Component3) {
   }, {
     key: "render",
     value: function render() {
-      var _this11 = this;
+      var _this10 = this;
 
       var inputs = this.props.attributes.map(function (attribute) {
         return /*#__PURE__*/React.createElement("p", {
-          key: _this11.props.student.entity[attribute]
+          key: _this10.props.student.entity[attribute]
         }, /*#__PURE__*/React.createElement("input", {
           type: "text",
           placeholder: attribute,
-          defaultValue: _this11.props.student.entity[attribute],
+          defaultValue: _this10.props.student.entity[attribute],
           ref: attribute,
           className: "field"
         }));
@@ -34470,21 +34514,21 @@ var StudentList = /*#__PURE__*/function (_React$Component4) {
   var _super4 = _createSuper(StudentList);
 
   function StudentList(props) {
-    var _this12;
+    var _this11;
 
     _classCallCheck(this, StudentList);
 
-    _this12 = _super4.call(this, props); //after bind this to the specific function
+    _this11 = _super4.call(this, props); //after bind this to the specific function
     //this is binded to this object
     //otherwise, this.props.onNavigate(this.props.links.last.href);
     //will have two different this
 
-    _this12.handleNavFirst = _this12.handleNavFirst.bind(_assertThisInitialized(_this12));
-    _this12.handleNavPrev = _this12.handleNavPrev.bind(_assertThisInitialized(_this12));
-    _this12.handleNavNext = _this12.handleNavNext.bind(_assertThisInitialized(_this12));
-    _this12.handleNavLast = _this12.handleNavLast.bind(_assertThisInitialized(_this12));
-    _this12.handleInput = _this12.handleInput.bind(_assertThisInitialized(_this12));
-    return _this12;
+    _this11.handleNavFirst = _this11.handleNavFirst.bind(_assertThisInitialized(_this11));
+    _this11.handleNavPrev = _this11.handleNavPrev.bind(_assertThisInitialized(_this11));
+    _this11.handleNavNext = _this11.handleNavNext.bind(_assertThisInitialized(_this11));
+    _this11.handleNavLast = _this11.handleNavLast.bind(_assertThisInitialized(_this11));
+    _this11.handleInput = _this11.handleInput.bind(_assertThisInitialized(_this11));
+    return _this11;
   } // tag:: handle-page-size-updates[]
 
 
@@ -34531,15 +34575,15 @@ var StudentList = /*#__PURE__*/function (_React$Component4) {
   }, {
     key: "render",
     value: function render() {
-      var _this13 = this;
+      var _this12 = this;
 
       var students = this.props.students.map(function (student) {
         return /*#__PURE__*/React.createElement(Student, {
           key: student.entity._links.self.href,
           student: student,
-          attributes: _this13.props.attributes,
-          onUpdate: _this13.props.onUpdate,
-          onDelete: _this13.props.onDelete
+          attributes: _this12.props.attributes,
+          onUpdate: _this12.props.onUpdate,
+          onDelete: _this12.props.onDelete
         });
       });
       var navLinks = [];
@@ -34589,13 +34633,13 @@ var Student = /*#__PURE__*/function (_React$Component5) {
   var _super5 = _createSuper(Student);
 
   function Student(props) {
-    var _this14;
+    var _this13;
 
     _classCallCheck(this, Student);
 
-    _this14 = _super5.call(this, props);
-    _this14.handleDelete = _this14.handleDelete.bind(_assertThisInitialized(_this14));
-    return _this14;
+    _this13 = _super5.call(this, props);
+    _this13.handleDelete = _this13.handleDelete.bind(_assertThisInitialized(_this13));
+    return _this13;
   }
 
   _createClass(Student, [{
@@ -34705,6 +34749,34 @@ module.exports = function follow(api, rootPath, relArray) {
     return entity._embedded && entity._embedded.hasOwnProperty(rel);
   }
 };
+
+/***/ }),
+
+/***/ "./src/main/js/websocket-listener.js":
+/*!*******************************************!*\
+  !*** ./src/main/js/websocket-listener.js ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var SockJS = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module 'sockjs-client'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+
+__webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module 'stompjs'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+
+function register(registrations) {
+  var socket = SockJS('/payroll');
+  var stompClient = Stomp.over(socket);
+  stompClient.connect({}, function (frame) {
+    registrations.forEach(function (registation) {
+      stompClient.subscribe(registation.route, registation.callback);
+    });
+  });
+}
+
+module.exports.register = register;
 
 /***/ }),
 

@@ -7,6 +7,8 @@ const client = require('./client');
 const follow=require('./follow');
 const when=require('when');
 
+var stompClient=require('./websocket-listener')
+
 var root='/api';
 
 //create a React component
@@ -22,11 +24,18 @@ class App extends React.Component {
         this.onUpdate=this.onUpdate.bind(this);
         this.onDelete = this.onDelete.bind(this);
         this.onNavigate = this.onNavigate.bind(this);
+        this.refreshAndGoToLastPage=this.refreshAndGoToLastPage.bind(this);
+        this.refreshCurrentPage=this.refreshCurrentPage.bind(this);
     }
 
     //React renders a component in the DOM
     componentDidMount() {
         this.loadFromServer(this.state.pageSize);
+        stompClient.register([
+        {route:'/topic/newStudent',callback:this.refreshAndGoToLastPage},
+        {route:'/topic/updateStudent',callback: this.refreshCurrentPage},
+        {route:'/topic/deleteStudent',callback: this.refreshCurrentPage}
+        ]);
     }
 
     //reload list with updated page
@@ -69,24 +78,14 @@ class App extends React.Component {
 
     //on create event to handle create a new student
     onCreate(newStudent){
-        const self=this;
         follow(client,root,['students']).then(response=>{
-            return client({
+            client({
                 method:'POST',
                 path: response.entity._links.self.href,
                 entity: newStudent,
                 headers:{'Content-Type':'application/json'}
             })
-        }).then(response => {
-            return follow(client,root,[
-                {rel: 'students', params: {'size': self.state.pageSize}}]);
-        }).done(response => {
-            if (typeof response.entity._links.last!=="undefined"){
-                this.onNavigate(response.entity._links.last.href);
-            } else {
-                this.onNavigate(response.entity._links.self.href);
-            }
-        });
+        })
     }
 
     //tag::update[]
@@ -100,7 +99,7 @@ class App extends React.Component {
                 'If-Match': student.headers.Etag
             }
         }).done(response => {
-            this.loadFromServer(this.state.pageSize);
+
         }, response =>{
             if (response.status.code ===412){
                 alert('Denied: unable to update'+
@@ -139,9 +138,8 @@ class App extends React.Component {
     }
 
     onDelete(student){
-        client({method:'DELETE',path: student.entity._links.self.href}).done(response=>{
-            this.loadFromServer(this.state.pageSize);
-        });
+        client({method:'DELETE',path: student.entity._links.self.href});
+
     }
 
     updatePageSize(pageSize){
@@ -150,6 +148,52 @@ class App extends React.Component {
         }
     }
 
+    //tag::refresh and go to last page
+    refreshAndGoToLastPage(message) {
+        follow(client,root, [{
+            rel:'students',
+            params:{size:this.state.pageSize}
+        }]).done(response => {
+            if (response.entity._links.last!==undefined) {
+                this.onNavigate(response.entity._links.last.href);
+            } else {
+                this.onNavigate(response.entity._links.self.href);
+            }
+        })
+    }
+    //end::refresh and go to last page
+
+    //tag::refresh and go to last page
+    refreshCurrentPage(message) {
+        follow(client,root,[{
+            rel:'students',
+            params:{
+                size:this.state.pageSize,
+                page:this.state.page.number
+            }
+        }]).then(studentCollection => {
+            this.links=studentCollection.entity._links;
+            this.page=studentCollection.entity.page;
+
+            return studentCollection.entity._embedded.students.map(student=>{
+                return client({
+                    method:'GET',
+                    path:student._links.self.href
+                })
+            });
+        }).then(studentPromises => {
+            return when.all(studentPromises);
+        }).then(students => {
+            this.setState({
+                page:this.page,
+                students:students,
+                attributes:Object.keys(this.schema.properties),
+                pageSize:this.state.pageSize,
+                links:this.links
+            });
+        });
+    }
+    //end::refresh and go to last page
         //draws the component
     render(){
         return(
