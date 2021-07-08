@@ -18,7 +18,7 @@ class App extends React.Component {
 
     constructor(props) {
         super(props);
-        this.state = {students: [], attributes: [], pageSize: 2, links: {}};
+        this.state = {students: [], attributes: [], page: 1, pageSize: 2, links: {}};
         this.updatePageSize = this.updatePageSize.bind(this);
         this.onCreate = this.onCreate.bind(this);
         this.onUpdate=this.onUpdate.bind(this);
@@ -57,6 +57,8 @@ class App extends React.Component {
             });
             //fetch each individual resource, including an ETag header
         }).then(studentCollection => {
+            //event
+            this.page=studentCollection.entity.page;
             return studentCollection.entity._embedded.students.map(student =>
             client({
                 method:'GET',
@@ -68,6 +70,8 @@ class App extends React.Component {
             return when.all(studentPromises);
         }).done(students =>{
             this.setState({
+                //event
+                page:this.page,
                 students:students,
                 attributes: Object.keys(this.schema.properties),
                 pageSize:pageSize,
@@ -99,7 +103,7 @@ class App extends React.Component {
                 'If-Match': student.headers.Etag
             }
         }).done(response => {
-
+            //event. let the websorkect handler update the state
         }, response =>{
             if (response.status.code ===412){
                 alert('Denied: unable to update'+
@@ -120,6 +124,9 @@ class App extends React.Component {
             path: navUri
         }).then(studentCollection =>{
             this.links=studentCollection.entity._links;
+            //event
+            this.page=studentCollection.entity.page;
+
             return studentCollection.entity._embedded.students.map(student =>
             client({
                 method:'GET',
@@ -129,6 +136,7 @@ class App extends React.Component {
             return when.all(studentPromises);
         }).done(students => {
             this.setState({
+                page:this.page,
                 students:students,
                 attributes: Object.keys(this.schema.properties),
                 pageSize:this.state.pageSize,
@@ -199,7 +207,8 @@ class App extends React.Component {
         return(
             <div>
                 <CreateDialog attributes={this.state.attributes} onCreate={this.onCreate}/>
-                <StudentList students={this.state.students}
+                <StudentList  page={this.state.page}
+                                students={this.state.students}
                               links={this.state.links}
                               pageSize={this.state.pageSize}
                              attributes={this.state.attributes}
