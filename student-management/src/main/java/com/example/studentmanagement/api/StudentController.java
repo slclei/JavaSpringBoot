@@ -5,7 +5,6 @@ import com.example.studentmanagement.exceptions.StudentEmptyNameException;
 import com.example.studentmanagement.exceptions.StudentNonExistException;
 import com.example.studentmanagement.model.Student;
 import com.example.studentmanagement.service.StudentService;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/student")
+@RequestMapping("/api/student")
 public class StudentController {
 
     private StudentService studentService;
@@ -25,8 +24,6 @@ public class StudentController {
     }
 
     @GetMapping
-    //shiro for permission
-    @RequiresPermissions("student:read")
     public List<Student> getAllStudents(){
         return studentService.getAllStudents();
     }
@@ -35,18 +32,6 @@ public class StudentController {
     //localhost:8080/api/student/name?name=zhangsan
     public List<Student> getStudents(@RequestParam String name){
         return studentService.getStudentsByName(name);
-    }
-
-    @GetMapping("/contain_name")
-    //localhost:8080/api/student/contain_name?name=T
-    public List<Student> getStudentsContainName(@RequestParam String name){
-        return studentService.getStudentsContainName(name);
-    }
-
-    @GetMapping("/class")
-    //localhost:8080/api/student/class?year=2021&number=1
-    public List<Student> getStudentsInClass(@RequestParam int year,@RequestParam int number){
-        return studentService.getStudentsInClass(year,number);
     }
 
     @RequestMapping("/register")
@@ -60,6 +45,7 @@ public class StudentController {
         }
     }
 
+    /*
     @PostMapping(path="assignclass/{sid}/{cid}")
     public ResponseEntity<String> assignClass(@PathVariable("sid") Long studentId,
                                               @PathVariable("cid") Long classId){
@@ -70,6 +56,20 @@ public class StudentController {
         }catch(InvalidUniversityClassException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }catch(StudentNonExistException e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }*/
+
+    @PostMapping(path="updateStudent/{sid}/{sn}")
+    public ResponseEntity<String> updateStudent(@PathVariable("sid") Long studentId,
+                                                @PathVariable("sn") String studentName){
+        try{
+            Student updatedStudent=studentService.getStudentById(studentId).get();
+            updatedStudent.setName(studentName);
+            studentService.updateStudent(updatedStudent);
+            return ResponseEntity.ok("Update student: "+updatedStudent.toString());
+
+        }catch(RuntimeException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
