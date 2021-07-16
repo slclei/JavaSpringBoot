@@ -15,9 +15,9 @@ public class UniversityClass {
 
     @Column(nullable = false)
     Integer number;
-
+/*
     @OneToMany(mappedBy = "universityClass")
-    List<Student> students;
+    List<Student> students;*/
 
     public UniversityClass(Long id, Integer year, Integer number) {
         this.id = id;

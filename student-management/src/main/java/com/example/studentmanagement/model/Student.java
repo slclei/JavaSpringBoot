@@ -1,7 +1,10 @@
 package com.example.studentmanagement.model;
 
 //import javax.annotation.processing.Generated;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import javax.persistence.*;
+import java.util.Objects;
 
 //tell the database that this is an entity
 //(name="") can be used to rename this entity
@@ -19,6 +22,34 @@ public class Student {
     @Column(nullable = false, name="name")
     private String name;
 
+    @Version
+    @JsonIgnore
+    private Long version;
+
+    @Override
+    public int hashCode(){
+        return Objects.hash(id,name,version);
+    }
+
+    @Override
+    public boolean equals(Object o){
+        if (this==o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Student student=(Student) o;
+        return Objects.equals(id, student.id) &&
+                Objects.equals(name, student.name) &&
+                Objects.equals(version, student.version);
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    /*
     public UniversityClass getUniversityClass() {
         return universityClass;
     }
@@ -30,7 +61,7 @@ public class Student {
     //set foreign key
     @ManyToOne
     @JoinColumn(name="University_Class_id")
-    private UniversityClass universityClass;
+    private UniversityClass universityClass;*/
 
     public Student(Long id, String name) {
         this.id = id;
